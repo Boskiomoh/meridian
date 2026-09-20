@@ -1,0 +1,636 @@
+{
+  "info": {
+    "name": "Meridian — RLS & API",
+    "description": "API-level verification for Meridian (Northlane Studio).\n\nThis collection talks to Supabase's REST endpoints directly, with no browser and no application code in the way. Its purpose is the negative tests: proving that an employee's own access token cannot read another employee's record, another team's leave requests, or another person's attendance — and cannot escalate its own role or approve its own leave.\n\nIf the boundary were only enforced in the Vue app, every negative test in here would fail.\n\nRun with:  newman run postman/meridian.postman_collection.json -e postman/meridian.postman_environment.json",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "employee_token", "value": "" },
+    { "key": "manager_token", "value": "" },
+    { "key": "admin_token", "value": "" },
+    { "key": "employee_id", "value": "" },
+    { "key": "outsider_id", "value": "" },
+    { "key": "pending_leave_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "0 · Sign in",
+      "item": [
+        {
+          "name": "Sign in as employee (Maya Okonkwo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('employee signs in', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('a session token comes back', () => pm.expect(body.access_token).to.be.a('string').and.not.empty);",
+                  "pm.collectionVariables.set('employee_token', body.access_token);",
+                  "pm.collectionVariables.set('employee_id', body.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"maya.okonkwo@northlane.studio\",\n  \"password\": \"{{demo_password}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/v1/token?grant_type=password", "host": ["{{base_url}}"], "path": ["auth", "v1", "token"], "query": [{ "key": "grant_type", "value": "password" }] }
+          }
+        },
+        {
+          "name": "Sign in as manager (Tobias Lind)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('manager signs in', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('manager_token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"tobias.lind@northlane.studio\",\n  \"password\": \"{{demo_password}}\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/v1/token?grant_type=password", "host": ["{{base_url}}"], "path": ["auth", "v1", "token"], "query": [{ "key": "grant_type", "value": "password" }] }
+          }
+        },
+        {
+          "name": "Sign in as HR admin (Priya Raghunathan)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('admin signs in', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('admin_token', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"priya.raghunathan@northlane.studio\",\n  \"password\": \"{{demo_password}}\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/v1/token?grant_type=password", "host": ["{{base_url}}"], "path": ["auth", "v1", "token"], "query": [{ "key": "grant_type", "value": "password" }] }
+          }
+        },
+        {
+          "name": "Wrong password is refused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a bad password is rejected', () => pm.expect(pm.response.code).to.be.oneOf([400, 401]));",
+                  "pm.test('no token is issued', () => pm.expect(pm.response.json().access_token).to.be.undefined);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"maya.okonkwo@northlane.studio\",\n  \"password\": \"not-the-password\"\n}" },
+            "url": { "raw": "{{base_url}}/auth/v1/token?grant_type=password", "host": ["{{base_url}}"], "path": ["auth", "v1", "token"], "query": [{ "key": "grant_type", "value": "password" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 · Fixtures (as admin)",
+      "item": [
+        {
+          "name": "Find an employee on another team (Lena Kowalski)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('admin can read any profile', () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json();",
+                  "pm.test('the fixture exists', () => pm.expect(rows).to.have.lengthOf(1));",
+                  "pm.collectionVariables.set('outsider_id', rows[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/profiles?select=id,full_name&full_name=eq.Lena Kowalski", "host": ["{{base_url}}"], "path": ["rest", "v1", "profiles"], "query": [{ "key": "select", "value": "id,full_name" }, { "key": "full_name", "value": "eq.Lena Kowalski" }] }
+          }
+        },
+        {
+          "name": "Admin sees the whole company",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json();",
+                  "pm.test('an admin sees every employee', () => pm.expect(rows.length).to.be.at.least(25));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/employees?select=id", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "select", "value": "id" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Employee — allowed",
+      "item": [
+        {
+          "name": "Employee reads their own record",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json();",
+                  "pm.test('exactly their own row comes back', () => pm.expect(rows).to.have.lengthOf(1));",
+                  "pm.test('and it is really theirs', () => pm.expect(rows[0].id).to.eql(pm.collectionVariables.get('employee_id')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/employees?select=*", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "select", "value": "*" }] }
+          }
+        },
+        {
+          "name": "Employee reads their own leave",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json();",
+                  "pm.test('some leave history exists', () => pm.expect(rows.length).to.be.above(0));",
+                  "const self = pm.collectionVariables.get('employee_id');",
+                  "pm.test('every row belongs to the caller', () => pm.expect(rows.every(r => r.employee_id === self)).to.be.true);",
+                  "const pending = rows.find(r => r.status === 'pending');",
+                  "if (pending) pm.collectionVariables.set('pending_leave_id', pending.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/leave_requests?select=*", "host": ["{{base_url}}"], "path": ["rest", "v1", "leave_requests"], "query": [{ "key": "select", "value": "*" }] }
+          }
+        },
+        {
+          "name": "Employee updates their own contact details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('the row was updated', () => pm.expect(pm.response.json()).to.have.lengthOf(1));",
+                  "pm.test('the new value stuck', () => pm.expect(pm.response.json()[0].location).to.eql('Lagos'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"location\": \"Lagos\"\n}" },
+            "url": { "raw": "{{base_url}}/rest/v1/employees?id=eq.{{employee_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "id", "value": "eq.{{employee_id}}" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Employee — NEGATIVE (the point of this collection)",
+      "item": [
+        {
+          "name": "✗ Cannot read another employee's record",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the request itself is well-formed', () => pm.response.to.have.status(200));",
+                  "pm.test(\"another employee's record is NOT returned\", () => pm.expect(pm.response.json()).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/employees?select=*&id=eq.{{outsider_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "select", "value": "*" }, { "key": "id", "value": "eq.{{outsider_id}}" }] }
+          }
+        },
+        {
+          "name": "✗ Cannot read another team's leave requests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test(\"another team's leave is NOT returned\", () => pm.expect(pm.response.json()).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/leave_requests?select=*&employee_id=eq.{{outsider_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "leave_requests"], "query": [{ "key": "select", "value": "*" }, { "key": "employee_id", "value": "eq.{{outsider_id}}" }] }
+          }
+        },
+        {
+          "name": "✗ Cannot read another employee's attendance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('no attendance rows leak', () => pm.expect(pm.response.json()).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/attendance_records?select=*&employee_id=eq.{{outsider_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "attendance_records"], "query": [{ "key": "select", "value": "*" }, { "key": "employee_id", "value": "eq.{{outsider_id}}" }] }
+          }
+        },
+        {
+          "name": "✗ An unfiltered read is still scoped to self",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json();",
+                  "const self = pm.collectionVariables.get('employee_id');",
+                  "pm.test('asking for everything still returns only self', () => pm.expect(rows.every(r => r.id === self)).to.be.true);",
+                  "pm.test('and that is a single row, not the company', () => pm.expect(rows).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/employees?select=id", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "select", "value": "id" }] }
+          }
+        },
+        {
+          "name": "✗ Cannot promote themselves to admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('privilege escalation is refused outright', () => pm.response.to.have.status(403));",
+                  "pm.test('and the reason is explicit', () => pm.expect(pm.response.json().message).to.match(/only an hr admin/i));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"admin\"\n}" },
+            "url": { "raw": "{{base_url}}/rest/v1/profiles?id=eq.{{employee_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "profiles"], "query": [{ "key": "id", "value": "eq.{{employee_id}}" }] }
+          }
+        },
+        {
+          "name": "✗ Cannot re-point their own reporting line",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('changing your own manager is refused', () => pm.response.to.have.status(403));",
+                  "pm.test('and the reason is explicit', () => pm.expect(pm.response.json().message).to.match(/reporting lines/i));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"manager_id\": null\n}" },
+            "url": { "raw": "{{base_url}}/rest/v1/profiles?id=eq.{{employee_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "profiles"], "query": [{ "key": "id", "value": "eq.{{employee_id}}" }] }
+          }
+        },
+        {
+          "name": "✗ Cannot approve their own leave request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const id = pm.collectionVariables.get('pending_leave_id');",
+                  "pm.test('fixture: a pending request exists', () => pm.expect(id).to.be.a('string').and.not.empty);",
+                  "pm.test('the update matches no row', () => pm.expect(pm.response.json()).to.have.lengthOf(0));",
+                  "// An empty array alone would be weak evidence, so re-read the row.",
+                  "const url = pm.environment.get('base_url') + '/rest/v1/leave_requests?select=status&id=eq.' + id;",
+                  "pm.sendRequest({",
+                  "  url,",
+                  "  method: 'GET',",
+                  "  header: {",
+                  "    apikey: pm.environment.get('anon_key'),",
+                  "    Authorization: 'Bearer ' + pm.collectionVariables.get('employee_token')",
+                  "  }",
+                  "}, (err, res) => {",
+                  "  pm.test('the request is STILL pending', () => {",
+                  "    pm.expect(err).to.be.null;",
+                  "    pm.expect(res.json()[0].status).to.eql('pending');",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Prefer", "value": "return=representation" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"approved\"\n}" },
+            "url": { "raw": "{{base_url}}/rest/v1/leave_requests?id=eq.{{pending_leave_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "leave_requests"], "query": [{ "key": "id", "value": "eq.{{pending_leave_id}}" }] }
+          }
+        },
+        {
+          "name": "✗ Cannot file leave on someone else's behalf",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('inserting for another employee is refused', () => pm.expect(pm.response.code).to.be.oneOf([401, 403]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"employee_id\": \"{{outsider_id}}\",\n  \"type\": \"vacation\",\n  \"start_date\": \"2026-12-01\",\n  \"end_date\": \"2026-12-05\",\n  \"reason\": \"Filed by the wrong person on purpose.\",\n  \"status\": \"pending\"\n}" },
+            "url": { "raw": "{{base_url}}/rest/v1/leave_requests", "host": ["{{base_url}}"], "path": ["rest", "v1", "leave_requests"] }
+          }
+        },
+        {
+          "name": "✗ Cannot call the create-employee function",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the privileged function refuses a non-admin', () => pm.response.to.have.status(403));",
+                  "pm.test('and says why', () => pm.expect(pm.response.json().error).to.match(/only an hr admin/i));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"full_name\": \"Mallory Intruder\",\n  \"email\": \"mallory.intruder@northlane.studio\",\n  \"title\": \"Unauthorised\",\n  \"start_date\": \"2026-09-16\",\n  \"role\": \"admin\"\n}" },
+            "url": { "raw": "{{base_url}}/functions/v1/create-employee", "host": ["{{base_url}}"], "path": ["functions", "v1", "create-employee"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Manager — scope",
+      "item": [
+        {
+          "name": "Manager reads their own team",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const rows = pm.response.json();",
+                  "pm.test('a manager sees themselves plus their reports', () => pm.expect(rows.length).to.be.within(2, 10));",
+                  "pm.test('but nothing like the whole company', () => pm.expect(rows.length).to.be.below(25));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{manager_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/employees?select=id", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "select", "value": "id" }] }
+          }
+        },
+        {
+          "name": "Manager can read a direct report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('the report is visible to their manager', () => pm.expect(pm.response.json()).to.have.lengthOf(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{manager_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/employees?select=id&id=eq.{{employee_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "select", "value": "id" }, { "key": "id", "value": "eq.{{employee_id}}" }] }
+          }
+        },
+        {
+          "name": "✗ Manager cannot read another manager's report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('someone else\\'s report is NOT returned', () => pm.expect(pm.response.json()).to.have.lengthOf(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "apikey", "value": "{{anon_key}}" },
+              { "key": "Authorization", "value": "Bearer {{manager_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/rest/v1/employees?select=id&id=eq.{{outsider_id}}", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "select", "value": "id" }, { "key": "id", "value": "eq.{{outsider_id}}" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Anonymous — nothing is public",
+      "item": [
+        {
+          "name": "✗ Anonymous cannot read employees",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('no employee data is public', () => {",
+                  "  if (pm.response.code === 200) {",
+                  "    pm.expect(pm.response.json()).to.have.lengthOf(0);",
+                  "  } else {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{anon_key}}" }],
+            "url": { "raw": "{{base_url}}/rest/v1/employees?select=*", "host": ["{{base_url}}"], "path": ["rest", "v1", "employees"], "query": [{ "key": "select", "value": "*" }] }
+          }
+        },
+        {
+          "name": "✗ Anonymous cannot read leave requests",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('no leave data is public', () => {",
+                  "  if (pm.response.code === 200) {",
+                  "    pm.expect(pm.response.json()).to.have.lengthOf(0);",
+                  "  } else {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "apikey", "value": "{{anon_key}}" }],
+            "url": { "raw": "{{base_url}}/rest/v1/leave_requests?select=*", "host": ["{{base_url}}"], "path": ["rest", "v1", "leave_requests"], "query": [{ "key": "select", "value": "*" }] }
+          }
+        }
+      ]
+    }
+  ]
+}
