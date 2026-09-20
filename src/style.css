@@ -1,0 +1,307 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Meridian design tokens.
+
+   Cool sage-stone paper, forest-pine accent, brass secondary. The nav sits on
+   its own deeper light layer so the shell has structural weight instead of
+   floating on white -- light-first throughout, no dark default anywhere.
+   --------------------------------------------------------------------------- */
+
+@theme {
+  /* surfaces, lightest to heaviest */
+  --color-bg: #eff2ee;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f3f6f2;
+  --color-nav: #e4ebe3;
+  --color-nav-deep: #dae3d9;
+
+  /* lines */
+  --color-border: #d3ded2;
+  --color-border-strong: #bccdbc;
+
+  /* text */
+  --color-ink: #16201a;
+  --color-ink-soft: #4c594f;
+  --color-ink-faint: #7c8b7e;
+  --color-ink-invert: #f2f6f1;
+
+  /* accent: forest pine, with the mid-tone the original palette was missing */
+  --color-accent: #1b4332;
+  --color-accent-mid: #2f6b4f;
+  --color-accent-ink: #0f2a20;
+  --color-accent-soft: #dce8de;
+  --color-accent-wash: #f0f6f1;
+
+  /* secondary: brass. owns "pending" and highlighted metrics */
+  --color-brass: #a6742b;
+  --color-brass-mid: #c08f3f;
+  --color-brass-soft: #f5ebda;
+
+  /* semantic only, never decorative */
+  --color-success: #3f7d4a;
+  --color-success-soft: #e0efe2;
+  --color-warning: #b8863a;
+  --color-warning-soft: #f7edda;
+  --color-danger: #a63a2e;
+  --color-danger-soft: #f7e3e0;
+
+  /* type: two families. data alignment comes from tabular numerals, not mono. */
+  --font-display: 'Schibsted Grotesk Variable', 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Work Sans Variable', 'Work Sans', ui-sans-serif, system-ui, sans-serif;
+
+  /* fixed rem scale -- product UI is viewed at consistent DPI, so no clamp() */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  --radius-panel: 8px;
+
+  /* shadows always carry an offset and a soft blur, tinted from the ink hue */
+  --shadow-raise: 0 1px 2px rgb(22 32 26 / 0.06), 0 2px 6px rgb(22 32 26 / 0.04);
+  --shadow-panel: 0 2px 4px rgb(22 32 26 / 0.05), 0 8px 20px rgb(22 32 26 / 0.07);
+  --shadow-pop: 0 4px 10px rgb(22 32 26 / 0.09), 0 16px 36px rgb(22 32 26 / 0.12);
+
+  /* layout constants the shell is built on */
+  --rail-w: 224px;
+  --inspector-w: 348px;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  /* Numbers in this product are nearly always compared down a column. */
+  table,
+  time,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* -----------------------------------------------------------------------
+     Browser surfaces. These ship with defaults that belong to no design
+     system; theming them is the cheapest signal a UI was built, not assembled.
+     ----------------------------------------------------------------------- */
+
+  ::selection {
+    background-color: var(--color-accent-soft);
+    color: var(--color-accent-ink);
+  }
+
+  :root {
+    caret-color: var(--color-accent);
+    accent-color: var(--color-accent);
+    scrollbar-color: var(--color-border-strong) transparent;
+    scrollbar-width: thin;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-ink-faint);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  a {
+    color: var(--color-accent);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* The one authored moment: a decided request settles into its new state.
+     Everything else in the product transitions in 150-200ms and says nothing. */
+  @keyframes settle {
+    0% {
+      opacity: 0;
+      transform: translateY(-3px);
+      background-color: var(--color-accent-soft);
+    }
+    60% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  .settle {
+    animation: settle 620ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes shimmer {
+    100% {
+      background-position: 180% 0;
+    }
+  }
+
+  .skeleton {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-surface-alt) 0%,
+      var(--color-nav) 40%,
+      var(--color-surface-alt) 80%
+    );
+    background-size: 220% 100%;
+    animation: shimmer 1.35s ease-in-out infinite;
+    border-radius: 4px;
+  }
+
+  /* One form-control vocabulary. Every input, select and textarea in the
+     product uses these, so a control never looks different on two screens. */
+  .field-input,
+  .field-select,
+  .field-textarea {
+    display: block;
+    width: 100%;
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: var(--text-base);
+    line-height: 1.4;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      background-color 150ms ease;
+  }
+
+  .field-input::placeholder,
+  .field-textarea::placeholder {
+    color: var(--color-ink-faint);
+  }
+
+  .field-input:hover:not(:disabled),
+  .field-select:hover:not(:disabled),
+  .field-textarea:hover:not(:disabled) {
+    border-color: var(--color-ink-faint);
+  }
+
+  .field-input:focus-visible,
+  .field-select:focus-visible,
+  .field-textarea:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-soft);
+  }
+
+  .field-input:disabled,
+  .field-select:disabled,
+  .field-textarea:disabled {
+    background-color: var(--color-surface-alt);
+    color: var(--color-ink-faint);
+    cursor: not-allowed;
+  }
+
+  .field-input[aria-invalid='true'],
+  .field-textarea[aria-invalid='true'] {
+    border-color: var(--color-danger);
+  }
+
+  .field-input[aria-invalid='true']:focus-visible,
+  .field-textarea[aria-invalid='true']:focus-visible {
+    box-shadow: 0 0 0 3px var(--color-danger-soft);
+  }
+
+  .field-textarea {
+    min-height: 5.5rem;
+    resize: vertical;
+  }
+
+  /* Native select keeps its own affordance; only the chevron is redrawn so it
+     matches the icon family instead of shipping the platform's glyph. */
+  .field-select {
+    appearance: none;
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234c594f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 15px;
+  }
+
+  /* Compact variant for the sticky filter bar. */
+  .field-sm {
+    padding-top: 0.3125rem;
+    padding-bottom: 0.3125rem;
+    font-size: var(--text-sm);
+    border-radius: 999px;
+  }
+}
