@@ -13,8 +13,11 @@ withDefaults(
     /** Drives the inspector: present on desktop, a full sheet on mobile. */
     inspectorOpen?: boolean
     inspectorLabel?: string
+    /** 'column' (default): a persistent third column on desktop. 'drawer':
+     * an overlay panel that only occupies space while a record is selected. */
+    inspectorMode?: 'column' | 'drawer'
   }>(),
-  { count: null, countNoun: 'records', inspectorOpen: false, inspectorLabel: 'Details' },
+  { count: null, countNoun: 'records', inspectorOpen: false, inspectorLabel: 'Details', inspectorMode: 'column' },
 )
 
 defineEmits<{ closeInspector: [] }>()
@@ -51,17 +54,63 @@ defineEmits<{ closeInspector: [] }>()
         <slot name="list" />
       </section>
 
-      <!-- Desktop: a persistent third column. The primary action always lands
-           here, never in a row, so a mis-click can never decide a request.
-           Rendered only on desktop so the sheet below is never a second copy. -->
+      <!-- Desktop, column mode: a persistent third column. The primary action
+           always lands here, never in a row, so a mis-click can never decide
+           a request. Rendered only on desktop so the sheet below is never a
+           second copy. -->
       <aside
-        v-if="$slots.inspector && isDesktop"
+        v-if="$slots.inspector && isDesktop && inspectorMode === 'column'"
         class="w-[var(--inspector-w)] shrink-0 overflow-y-auto border-l border-border bg-surface"
         :aria-label="inspectorLabel"
       >
         <slot name="inspector" />
       </aside>
     </div>
+
+    <!-- Desktop, drawer mode: an overlay panel that only claims space while a
+         record is selected, instead of a column that sits there empty.
+         Unmounted (not just hidden) when closed, so its buttons and links
+         never sit in the tab order off-screen. -->
+    <template v-if="$slots.inspector && isDesktop && inspectorMode === 'drawer'">
+      <Transition
+        enter-active-class="transition-opacity duration-200 ease-out"
+        leave-active-class="transition-opacity duration-150 ease-in"
+        enter-from-class="opacity-0"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="inspectorOpen"
+          class="fixed inset-0 z-30 bg-ink/25"
+          @click="$emit('closeInspector')"
+        />
+      </Transition>
+      <Transition
+        enter-active-class="transition-transform duration-200 ease-out"
+        leave-active-class="transition-transform duration-150 ease-in"
+        enter-from-class="translate-x-full"
+        leave-to-class="translate-x-full"
+      >
+        <aside
+          v-if="inspectorOpen"
+          class="fixed inset-y-0 right-0 z-40 flex w-[min(34vw,720px)] min-w-[420px] flex-col border-l border-border bg-surface shadow-[var(--shadow-pop)]"
+          :aria-label="inspectorLabel"
+        >
+          <div class="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+            <span class="font-display text-md font-semibold text-ink">{{ inspectorLabel }}</span>
+            <button
+              class="inline-flex size-9 items-center justify-center rounded-full text-ink-soft transition-colors duration-150 hover:bg-surface-alt hover:text-ink"
+              aria-label="Close"
+              @click="$emit('closeInspector')"
+            >
+              <X :size="18" :stroke-width="2" />
+            </button>
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto">
+            <slot name="inspector" />
+          </div>
+        </aside>
+      </Transition>
+    </template>
 
     <!-- Mobile: the same inspector content as a sheet, not a squeezed column. -->
     <div

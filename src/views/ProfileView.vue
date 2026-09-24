@@ -6,6 +6,7 @@ import { useEmployeesQuery, usePeopleById, useUpdateContactMutation } from '@/qu
 import { useAuthStore } from '@/stores/auth'
 import { useLeaveRequestsQuery } from '@/queries/leave'
 import { useEmployeeAttendanceQuery } from '@/queries/attendance'
+import { useToast } from '@/composables/useToast'
 import {
   EMPLOYMENT_STATUS_LABEL,
   ROLE_LABEL,
@@ -27,6 +28,7 @@ const { isPending: peopleLoading } = useEmployeesQuery()
 const peopleById = usePeopleById()
 const { data: leaveRequests } = useLeaveRequestsQuery()
 const updateContact = useUpdateContactMutation()
+const toast = useToast()
 
 const personId = computed(() =>
   route.name === 'me' ? auth.userId : ((route.params.id as string | undefined) ?? null),
@@ -65,9 +67,12 @@ async function save() {
         location: draft.value.location.trim() || null,
       },
     })
+    toast.success('Contact details updated')
     editing.value = false
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : 'Could not save those details.'
+    const message = err instanceof Error ? err.message : 'Could not save those details.'
+    saveError.value = message
+    toast.error('Could not save those details', message)
   }
 }
 

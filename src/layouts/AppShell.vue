@@ -13,11 +13,15 @@ import {
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { ROLE_LABEL } from '@/lib/format'
+import { useConfirm } from '@/composables/useConfirm'
+import { useToast } from '@/composables/useToast'
 import AvatarMark from '@/components/AvatarMark.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
+const { confirm } = useConfirm()
+const toast = useToast()
 
 const drawerOpen = ref(false)
 watch(() => route.fullPath, () => (drawerOpen.value = false))
@@ -44,8 +48,16 @@ const isCurrent = (name: string) =>
   route.name === name || (name === 'directory' && route.name === 'person')
 
 async function signOut() {
+  const ok = await confirm({
+    title: 'Sign out of Meridian?',
+    body: 'You will need to sign in again to get back to your dashboard.',
+    confirmLabel: 'Sign out',
+  })
+  if (!ok) return
+
   await auth.signOut()
   await router.push({ name: 'login' })
+  toast.success('Signed out')
 }
 </script>
 

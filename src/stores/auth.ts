@@ -119,7 +119,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function signOut() {
-    await supabase.auth.signOut()
+    // Local, not the default global: the demo logins are shared, and a global
+    // sign-out would end every other visitor's session on the same account.
+    await supabase.auth.signOut({ scope: 'local' })
     session.value = null
     profile.value = null
     // Every cached query (employees, leave requests, attendance, documents,

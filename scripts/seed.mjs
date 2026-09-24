@@ -297,6 +297,35 @@ async function main() {
   }
   console.log('\n   ' + attendance.length + ' rows')
 
+  // The demo logins are public and the seed runs nightly (.github/workflows/reset-demo.yml),
+  // so anything a visitor added is rolled back: uploaded documents and renamed or invented
+  // departments. People, roles, reporting lines, leave and attendance are restored above.
+  console.log('-> documents')
+  {
+    const { error: rowsErr } = await db.from('documents').delete().gte('uploaded_at', '1970-01-01')
+    if (rowsErr) throw rowsErr
+    let removed = 0
+    const { data: folders, error: listErr } = await db.storage.from('documents').list('', { limit: 1000 })
+    if (listErr) throw listErr
+    for (const folder of folders ?? []) {
+      const { data: files, error: filesErr } = await db.storage.from('documents').list(folder.name, { limit: 1000 })
+      if (filesErr) throw filesErr
+      const paths = (files ?? []).map((f) => `${folder.name}/${f.name}`)
+      if (paths.length) {
+        const { error: rmErr } = await db.storage.from('documents').remove(paths)
+        if (rmErr) throw rmErr
+        removed += paths.length
+      }
+    }
+    console.log('   ' + removed + ' file(s) removed')
+  }
+
+  console.log('-> departments not in the roster')
+  {
+    const { error } = await db.from('departments').delete().not('name', 'in', `(${DEPARTMENTS.map((d) => `"${d}"`).join(',')})`)
+    if (error) throw error
+  }
+
   console.log('\nDemo logins (password: ' + DEMO_PASSWORD + ')')
   for (const p of PEOPLE.filter((x) => x.demo)) {
     console.log('  ' + p.role.padEnd(8) + ' ' + emailFor(p.name) + '  - ' + p.name + ', ' + p.title)

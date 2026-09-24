@@ -10,6 +10,7 @@ import WorkSurface from '@/components/WorkSurface.vue'
 import StatusPill from '@/components/StatusPill.vue'
 import AvatarMark from '@/components/AvatarMark.vue'
 import AppButton from '@/components/AppButton.vue'
+import AppSelect from '@/components/AppSelect.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import SkeletonRows from '@/components/SkeletonRows.vue'
 import PersonInspector from '@/components/PersonInspector.vue'
@@ -56,6 +57,7 @@ function openProfile(id: string) {
     :count-noun="visible.length === 1 ? 'person' : 'people'"
     :inspector-open="selectedId !== null"
     inspector-label="Employee details"
+    inspector-mode="drawer"
     @close-inspector="selectedId = null"
   >
     <template #actions>
@@ -82,22 +84,22 @@ function openProfile(id: string) {
         />
       </div>
 
-      <select v-model="filters.departmentFilter" class="field-select field-sm w-auto" aria-label="Filter by department">
+      <AppSelect v-model="filters.departmentFilter" size="sm" class="w-auto" aria-label="Filter by department">
         <option value="all">All departments</option>
         <option v-for="d in departments ?? []" :key="d.id" :value="d.id">{{ d.name }}</option>
-      </select>
+      </AppSelect>
 
-      <select v-model="filters.statusFilter" class="field-select field-sm w-auto" aria-label="Filter by status">
+      <AppSelect v-model="filters.statusFilter" size="sm" class="w-auto" aria-label="Filter by status">
         <option value="all">Any status</option>
         <option v-for="(label, value) in EMPLOYMENT_STATUS_LABEL" :key="value" :value="value">
           {{ label }}
         </option>
-      </select>
+      </AppSelect>
 
-      <select v-model="filters.roleFilter" class="field-select field-sm w-auto" aria-label="Filter by role">
+      <AppSelect v-model="filters.roleFilter" size="sm" class="w-auto" aria-label="Filter by role">
         <option value="all">Any role</option>
         <option v-for="(label, value) in ROLE_LABEL" :key="value" :value="value">{{ label }}</option>
-      </select>
+      </AppSelect>
 
       <button
         v-if="filters.hasFilters"
