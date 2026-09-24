@@ -73,6 +73,7 @@ const emptyCopy = computed(() =>
     :count-noun="rows.length === 1 ? 'request' : 'requests'"
     :inspector-open="selectedId !== null"
     inspector-label="Request"
+    inspector-mode="drawer"
     @close-inspector="selectedId = null"
   >
     <template #actions>

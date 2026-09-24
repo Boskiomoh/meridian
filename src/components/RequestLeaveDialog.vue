@@ -3,9 +3,12 @@ import { computed, onMounted, reactive, useTemplateRef } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useSubmitLeaveMutation } from '@/queries/leave'
 import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
 import type { LeaveType } from '@/lib/supabase'
 import { LEAVE_TYPE_LABEL, businessDays } from '@/lib/format'
 import AppButton from '@/components/AppButton.vue'
+import AppSelect from '@/components/AppSelect.vue'
+import AppDatePicker from '@/components/AppDatePicker.vue'
 import FormField from '@/components/FormField.vue'
 
 const emit = defineEmits<{ close: [] }>()
@@ -13,6 +16,7 @@ const emit = defineEmits<{ close: [] }>()
 const auth = useAuthStore()
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const submitLeave = useSubmitLeaveMutation()
+const toast = useToast()
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -59,9 +63,14 @@ async function submit() {
       end_date: form.end_date,
       reason: form.reason.trim(),
     })
+    toast.success('Leave request submitted', 'Your manager will see it in their queue.')
     close()
-  } catch {
-    // submitLeave.error is reactive and rendered below.
+  } catch (err) {
+    // submitLeave.error is also reactive and rendered below.
+    toast.error(
+      'Could not submit that request',
+      err instanceof Error ? err.message : undefined,
+    )
   }
 }
 </script>
@@ -95,24 +104,28 @@ async function submit() {
 
       <div class="flex flex-col gap-4 px-6 py-5">
         <FormField v-slot="{ id }" label="Type of leave" required>
-          <select :id="id" v-model="form.type" class="field-select">
+          <AppSelect
+            :id="id"
+            :model-value="form.type"
+            @update:model-value="(v) => (form.type = v as LeaveType)"
+          >
             <option v-for="(label, value) in LEAVE_TYPE_LABEL" :key="value" :value="value">
               {{ label }}
             </option>
-          </select>
+          </AppSelect>
         </FormField>
 
         <div class="grid grid-cols-2 gap-3">
           <FormField v-slot="{ id, describedBy, invalid }" label="First day" required :error="errors.start_date">
-            <input
+            <AppDatePicker
               :id="id" v-model="form.start_date" :aria-describedby="describedBy" :aria-invalid="invalid"
-              type="date" :min="today" class="field-input"
+              :min="today"
             />
           </FormField>
           <FormField v-slot="{ id, describedBy, invalid }" label="Last day" required :error="errors.end_date">
-            <input
+            <AppDatePicker
               :id="id" v-model="form.end_date" :aria-describedby="describedBy" :aria-invalid="invalid"
-              type="date" :min="form.start_date || today" class="field-input"
+              :min="form.start_date || today"
             />
           </FormField>
         </div>

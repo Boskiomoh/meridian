@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 import { FileText, Trash2, Upload } from 'lucide-vue-next'
 import { useDeleteDocumentMutation, useDocumentsQuery, useUploadDocumentMutation, getDocumentSignedUrl } from '@/queries/documents'
+import { useConfirm } from '@/composables/useConfirm'
+import { useToast } from '@/composables/useToast'
 import { formatDate } from '@/lib/format'
 import type { DocumentRow } from '@/schemas'
 import AppButton from '@/components/AppButton.vue'
@@ -12,6 +14,8 @@ const employeeId = computed(() => props.employeeId)
 const { data: documents, isPending: loading } = useDocumentsQuery(employeeId)
 const upload = useUploadDocumentMutation(employeeId)
 const remove = useDeleteDocumentMutation(employeeId)
+const { confirm } = useConfirm()
+const toast = useToast()
 
 const error = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -25,18 +29,32 @@ async function onPick(event: Event) {
   error.value = null
   try {
     await upload.mutateAsync(file)
+    toast.success('Document uploaded', file.name)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not upload that file.'
+    const message = err instanceof Error ? err.message : 'Could not upload that file.'
+    error.value = message
+    toast.error('Could not upload that file', message)
   }
   input.value = ''
 }
 
 async function onRemove(doc: DocumentRow) {
+  const ok = await confirm({
+    title: `Delete ${doc.file_name}?`,
+    body: 'This cannot be undone.',
+    confirmLabel: 'Delete',
+    variant: 'danger',
+  })
+  if (!ok) return
+
   error.value = null
   try {
     await remove.mutateAsync(doc)
+    toast.success('Document deleted', doc.file_name)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not delete that document.'
+    const message = err instanceof Error ? err.message : 'Could not delete that document.'
+    error.value = message
+    toast.error('Could not delete that document', message)
   }
 }
 
@@ -45,7 +63,9 @@ async function open(doc: DocumentRow) {
     const url = await getDocumentSignedUrl(doc.storage_path)
     window.open(url, '_blank', 'noopener')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Could not open that document.'
+    const message = err instanceof Error ? err.message : 'Could not open that document.'
+    error.value = message
+    toast.error('Could not open that document', message)
   }
 }
 </script>

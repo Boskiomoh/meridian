@@ -105,6 +105,7 @@ const GRID =
     :count-noun="summaries.length === 1 ? 'person' : 'people'"
     :inspector-open="selectedId !== null"
     inspector-label="Attendance detail"
+    inspector-mode="drawer"
     @close-inspector="selectedId = null"
   >
     <template #filters>

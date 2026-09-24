@@ -5,6 +5,8 @@ import type { Person } from '@/schemas'
 import { usePeopleById, useSetEmploymentStatusMutation } from '@/queries/people'
 import { useLeaveRequestsQuery } from '@/queries/leave'
 import { useAuthStore } from '@/stores/auth'
+import { useConfirm } from '@/composables/useConfirm'
+import { useToast } from '@/composables/useToast'
 import { ROLE_LABEL, businessDays, formatDate } from '@/lib/format'
 import AvatarMark from '@/components/AvatarMark.vue'
 import StatusPill from '@/components/StatusPill.vue'
@@ -17,6 +19,8 @@ const auth = useAuthStore()
 const peopleById = usePeopleById()
 const { data: leaveRequests, isPending: leaveLoading } = useLeaveRequestsQuery()
 const setStatus = useSetEmploymentStatusMutation()
+const { confirm } = useConfirm()
+const toast = useToast()
 
 const actionError = ref<string | null>(null)
 
@@ -45,14 +49,32 @@ const remaining = computed(() => {
 
 async function toggleActive() {
   if (!props.person) return
+  const deactivating = props.person.employment_status !== 'deactivated'
+
+  if (deactivating) {
+    const ok = await confirm({
+      title: `Deactivate ${props.person.full_name}?`,
+      body: 'They will immediately lose access to their account. You can reactivate them at any time.',
+      confirmLabel: 'Deactivate',
+      variant: 'danger',
+    })
+    if (!ok) return
+  }
+
   actionError.value = null
   try {
     await setStatus.mutateAsync({
       id: props.person.id,
-      status: props.person.employment_status === 'deactivated' ? 'active' : 'deactivated',
+      status: deactivating ? 'deactivated' : 'active',
     })
+    toast.success(
+      deactivating ? 'Employee deactivated' : 'Employee reactivated',
+      props.person.full_name,
+    )
   } catch (err) {
-    actionError.value = err instanceof Error ? err.message : 'Could not update employment status.'
+    const message = err instanceof Error ? err.message : 'Could not update employment status.'
+    actionError.value = message
+    toast.error('Could not update employment status', message)
   }
 }
 </script>

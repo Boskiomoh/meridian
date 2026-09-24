@@ -1,0 +1,40 @@
+# Nightly demo reset. The demo logins are public, so whatever a visitor changed (people,
+# roles, leave, documents, departments) is put back to the seed every night at 03:30 UTC.
+#
+# Needs two repository secrets (Settings > Secrets and variables > Actions):
+#   SUPABASE_URL                https://wadbljswuonhahncayoo.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY   the project's secret key (never commit it)
+#
+# Runs only on the schedule or by hand, never on pull requests, so the secret is never
+# exposed to code from a fork.
+name: Reset demo data
+
+on:
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reset-demo
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node scripts/seed.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

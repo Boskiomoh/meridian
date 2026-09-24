@@ -2,7 +2,10 @@
 import { computed, onMounted, reactive, useTemplateRef } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useCreateEmployeeMutation, useDepartmentsQuery, useEmployeesQuery } from '@/queries/people'
+import { useToast } from '@/composables/useToast'
 import AppButton from '@/components/AppButton.vue'
+import AppSelect from '@/components/AppSelect.vue'
+import AppDatePicker from '@/components/AppDatePicker.vue'
 import FormField from '@/components/FormField.vue'
 
 const emit = defineEmits<{ close: [] }>()
@@ -11,6 +14,7 @@ const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const { data: departments } = useDepartmentsQuery()
 const { data: employees } = useEmployeesQuery()
 const createEmployee = useCreateEmployeeMutation()
+const toast = useToast()
 
 const form = reactive({
   full_name: '',
@@ -63,9 +67,15 @@ async function submit() {
       manager_id: form.manager_id || null,
       leave_allowance_days: Number(form.leave_allowance_days) || 25,
     })
+    toast.success('Employee added', form.full_name.trim())
     close()
-  } catch {
-    // createEmployee.error is reactive and rendered below; nothing else to do.
+  } catch (err) {
+    // createEmployee.error is also reactive and rendered below, for anyone
+    // still looking at the dialog when it fails.
+    toast.error(
+      'Could not add that employee',
+      err instanceof Error ? err.message : undefined,
+    )
   }
 }
 </script>
@@ -120,31 +130,35 @@ async function submit() {
         </FormField>
 
         <FormField v-slot="{ id }" label="Department">
-          <select :id="id" v-model="form.department_id" class="field-select">
+          <AppSelect :id="id" v-model="form.department_id">
             <option value="">Unassigned</option>
             <option v-for="d in departments ?? []" :key="d.id" :value="d.id">{{ d.name }}</option>
-          </select>
+          </AppSelect>
         </FormField>
 
         <FormField v-slot="{ id, describedBy, invalid }" label="Start date" required :error="errors.start_date">
-          <input :id="id" v-model="form.start_date" :aria-describedby="describedBy" :aria-invalid="invalid" type="date" class="field-input" />
+          <AppDatePicker :id="id" v-model="form.start_date" :aria-describedby="describedBy" :aria-invalid="invalid" />
         </FormField>
 
         <FormField v-slot="{ id }" label="Role" required>
-          <select :id="id" v-model="form.role" class="field-select">
+          <AppSelect
+            :id="id"
+            :model-value="form.role"
+            @update:model-value="(v) => (form.role = v as 'employee' | 'manager' | 'admin')"
+          >
             <option value="employee">Employee</option>
             <option value="manager">Manager</option>
             <option value="admin">HR Admin</option>
-          </select>
+          </AppSelect>
         </FormField>
 
         <FormField v-slot="{ id }" label="Reports to">
-          <select :id="id" v-model="form.manager_id" class="field-select">
+          <AppSelect :id="id" v-model="form.manager_id">
             <option value="">No manager</option>
             <option v-for="m in managers" :key="m.id" :value="m.id">
               {{ m.full_name }} — {{ m.title }}
             </option>
-          </select>
+          </AppSelect>
         </FormField>
 
         <FormField v-slot="{ id }" label="Annual leave" hint="Working days per year.">

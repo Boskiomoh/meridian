@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { CalendarDays, CalendarCheck2, MessageSquareQuote, CircleAlert } from 'lucide-vue-next'
 import { useDecideLeaveMutation, useLeaveRequestsQuery } from '@/queries/leave'
 import { usePeopleById } from '@/queries/people'
+import { useToast } from '@/composables/useToast'
 import type { LeaveRequest } from '@/schemas'
 import { LEAVE_TYPE_LABEL, businessDays, formatDate, formatDateRange } from '@/lib/format'
 import AvatarMark from '@/components/AvatarMark.vue'
@@ -15,6 +16,7 @@ defineEmits<{ close: [] }>()
 const { data: allRequests } = useLeaveRequestsQuery()
 const peopleById = usePeopleById()
 const decide = useDecideLeaveMutation()
+const toast = useToast()
 
 const comment = ref('')
 const localError = ref<string | null>(null)
@@ -54,9 +56,15 @@ async function makeDecision(status: 'approved' | 'denied') {
   localError.value = null
   try {
     await decide.mutateAsync({ id: props.request.id, status, comment: comment.value })
+    toast.success(
+      status === 'approved' ? 'Request approved' : 'Request denied',
+      props.request.employee_name,
+    )
     comment.value = ''
   } catch (err) {
-    localError.value = err instanceof Error ? err.message : 'Could not save that decision.'
+    const message = err instanceof Error ? err.message : 'Could not save that decision.'
+    localError.value = message
+    toast.error('Could not save that decision', message)
   } finally {
     busy.value = null
   }

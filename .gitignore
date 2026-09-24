@@ -40,3 +40,5 @@ supabase/.temp/
 
 # AI-tooling scratch state
 .impeccable/
+
+.vercel

@@ -210,11 +210,28 @@ Three layers, because RLS alone does not cover all of it:
    `profiles` policy cannot recurse.
 2. **Triggers decide which _columns_ you can change.** `profiles_update` lets you write
    your own row — which, without a guard, would let any employee set `role = 'admin'`.
-   `guard_profile_self_update` refuses that with a `42501`. The same pattern limits an
-   employee's self-edit to contact details only.
+   `guard_profile_self_update` refuses that with a `42501`, and only an HR admin can
+   change a name or email. The same pattern limits an employee's self-edit to contact
+   details only.
 3. **A trigger stamps the decision.** `decided_by` is set server-side from `auth.uid()`,
    so it cannot be spoofed by the client, and a decided request cannot be re-opened or
-   rewritten.
+   rewritten, including the employee's reason.
+
+Because the demo logins are public, the demo itself is hardened too:
+
+- **Demo accounts are locked at the database.** Their password, email and phone can't
+  change, MFA can't be enrolled, and even the demo HR admin can't delete, re-role or
+  deactivate them, so every visitor finds all three roles working.
+- **Nightly reset.** `.github/workflows/reset-demo.yml` re-runs the seed at 03:30 UTC:
+  people, roles, reporting lines, leave, attendance, departments and uploaded documents
+  return to the seed.
+- **Uploads need a real employee**, and a document record can only point at a file in its
+  own employee's folder.
+- **`create-employee`** validates every field, only accepts `@northlane.studio` addresses
+  (the demo never holds real people), and never returns raw database errors.
+- **Security headers** (`vercel.json`): a strict Content-Security-Policy
+  (`script-src 'self'`), `X-Frame-Options: DENY`, `nosniff`, referrer and permissions
+  policies.
 
 All of it is in `supabase/migrations/`, which is the authoritative record.
 
